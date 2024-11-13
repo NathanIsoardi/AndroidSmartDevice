@@ -1,37 +1,45 @@
-package fr.isen.Isoardi.androidsmartdevice.composable
+package fr.isen.Isoardi.androidsmartdevice
 
-import android.bluetooth.le.ScanResult
-import androidx.compose.foundation.Image
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.*
+import androidx.compose.material3.ListItem
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.res.painterResource
-import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import fr.isen.Isoardi.androidsmartdevice.R
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun getColorForRSSI(rssi: Int): Color {
+    return when {
+        rssi >= -50 -> Color(0xFF4CAF50) // Vert
+        rssi >= -70 -> Color(0xFFFFC107) // Jaune
+        else -> Color(0xFFF44336)        // Rouge
+    }
+}
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ScanScreen(
     modifier: Modifier = Modifier,
-    scanResults: List<ScanResult>,
+    scanResults: List<BLEDevice>,
     isScanning: Boolean,
-    onScanToggle: () -> Unit
+    onScanToggle: () -> Unit,
+    onDeviceClick: (BLEDevice) -> Unit
 ) {
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("AndroidSmartDevice") },
-                colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = Color.LightGray,
-                    titleContentColor = Color.White
-                )
+                title = { Text("AndroidSmartDevice") }
             )
         }
     ) { paddingValues ->
@@ -39,52 +47,79 @@ fun ScanScreen(
             modifier = modifier
                 .fillMaxSize()
                 .padding(paddingValues)
-                .padding(16.dp),
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.Center
+                .padding(16.dp)
         ) {
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.Center
+            Button(
+                onClick = onScanToggle,
+                modifier = Modifier.fillMaxWidth()
             ) {
-                Text(
-                    text = "Lancer le Scan BLE",
-                    fontSize = 20.sp,
-                    fontWeight = FontWeight.Bold
-                )
-                Spacer(modifier = Modifier.width(8.dp))
-                Image(
-                    painter = painterResource(id = R.drawable.fleche),
-                    contentDescription = "Arrow Icon",
-                    modifier = Modifier.size(24.dp)
-                )
-            }
-
-            Spacer(modifier = Modifier.height(24.dp))
-
-            Button(onClick = onScanToggle) {
                 Text(text = if (isScanning) "Arrêter le scan BLE" else "Lancer le scan BLE")
             }
-
-            Spacer(modifier = Modifier.height(24.dp))
 
             if (isScanning) {
                 LinearProgressIndicator(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(top = 16.dp),
-                    color = MaterialTheme.colorScheme.primary
+                        .padding(vertical = 16.dp)
                 )
+            } else {
+                Spacer(modifier = Modifier.height(16.dp))
             }
 
-            LazyColumn(modifier = Modifier.fillMaxSize().padding(top = 16.dp)) {
-                items(scanResults) { result ->
-                    val deviceName = result.device.name ?: "Inconnu"
-                    val deviceAddress = result.device.address ?: "Adresse inconnue"
-                    Text(text = "Appareil : $deviceName\nAdresse: $deviceAddress")
-                    Divider(color = Color.LightGray, thickness = 1.dp)
+            if (scanResults.isEmpty()) {
+                Text(
+                    text = if (isScanning) "Scanning en cours..." else "Aucun appareil détecté",
+                    fontSize = 16.sp,
+                    modifier = Modifier.align(Alignment.CenterHorizontally)
+                )
+            } else {
+                LazyColumn(modifier = Modifier.fillMaxSize()) {
+                    items(scanResults) { device ->
+                        ListItem(
+                            modifier = Modifier
+                                .clickable { onDeviceClick(device) }
+                                .padding(vertical = 8.dp),
+                            headlineContent = {
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    modifier = Modifier.fillMaxWidth()
+                                ) {
+                                    // Colonne pour le nom et l'adresse
+                                    Column(
+                                        modifier = Modifier.weight(1f)
+                                    ) {
+                                        Text(
+                                            text = device.name,
+                                            style = MaterialTheme.typography.bodyLarge
+                                        )
+                                        Text(
+                                            text = device.address,
+                                            style = MaterialTheme.typography.bodySmall
+                                        )
+                                    }
+                                    // Cercle avec le RSSI
+                                    Box(
+                                        contentAlignment = Alignment.Center,
+                                        modifier = Modifier
+                                            .size(40.dp)
+                                            .clip(CircleShape)
+                                            .background(color = getColorForRSSI(device.rssi))
+                                    ) {
+                                        Text(
+                                            text = "${device.rssi}",
+                                            color = Color.White,
+                                            textAlign = TextAlign.Center,
+                                            style = MaterialTheme.typography.bodyMedium
+                                        )
+                                    }
+                                }
+                            }
+                        )
+                        Divider()
+                    }
                 }
             }
         }
     }
 }
+
