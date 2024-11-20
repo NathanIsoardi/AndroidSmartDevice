@@ -11,6 +11,7 @@ import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import androidx.annotation.RequiresApi
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
@@ -22,6 +23,7 @@ class LedActivity : ComponentActivity() {
     private var deviceName: String = "Inconnu"
     private var deviceAddress: String = "Adresse inconnue"
     private var bluetoothGatt: BluetoothGatt? = null
+    private var bluetoothDevice: BluetoothDevice? = null
 
     // État de connexion
     private var isConnected by mutableStateOf(false)
@@ -40,7 +42,8 @@ class LedActivity : ComponentActivity() {
         deviceName = intent.getStringExtra("DEVICE_NAME") ?: "Inconnu"
         deviceAddress = intent.getStringExtra("DEVICE_ADDRESS") ?: "Adresse inconnue"
 
-        Log.d("LedActivity", "deviceName: $deviceName, deviceAddress: $deviceAddress")
+        Log.d("LedActivity", "deviceName: $deviceName")
+        Log.d("LedActivity", "deviceAddress: $deviceAddress")
 
         // Vérifier que l'adresse de l'appareil est valide
         if (deviceAddress == "Adresse inconnue") {
@@ -54,52 +57,86 @@ class LedActivity : ComponentActivity() {
                 LedComposable(
                     deviceName = deviceName,
                     isConnected = isConnected && servicesDiscovered,
-                    onLedButtonClick = { ledState -> controlLed(ledState) },
-                    onDisconnectClick = { disconnectFromDevice() }
+                    onConnectClick = { connectToDevice() },
+                    onDisconnectClick = { disconnectFromDevice() },
+                    onLedButtonClick = { ledState -> controlLed(ledState) }
                 )
             }
         }
 
-        // Démarrer la connexion à l'appareil
-        connectToDevice()
+        checkPermissions()
     }
 
-    private fun connectToDevice() {
+    @RequiresApi(Build.VERSION_CODES.S)
+    private val permissions = arrayOf(Manifest.permission.BLUETOOTH_CONNECT
+    )
+
+    private val PERMISSION_REQUEST_CODE = 1
+
+    private fun checkPermissions() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            if (permissions.any { checkSelfPermission(it) != PackageManager.PERMISSION_GRANTED }) {
+                requestPermissions(permissions, PERMISSION_REQUEST_CODE)
+            } else {
+                // Les permissions sont accordées, continuez
+                initializeBluetooth()
+            }
+        } else {
+            // Les permissions sont accordées par défaut pour les versions antérieures, continuez
+            initializeBluetooth()
+        }
+    }
+
+    private fun initializeBluetooth() {
         val bluetoothManager = getSystemService(Context.BLUETOOTH_SERVICE) as BluetoothManager
         val bluetoothAdapter = bluetoothManager.adapter
 
-        // Vérifier les permissions pour Android 12+
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-            if (checkSelfPermission(Manifest.permission.BLUETOOTH_CONNECT) != PackageManager.PERMISSION_GRANTED) {
-                requestPermissions(arrayOf(Manifest.permission.BLUETOOTH_CONNECT), PERMISSION_REQUEST_CODE)
-                return
-            }
+        if (bluetoothAdapter == null || !bluetoothAdapter.isEnabled) {
+            Toast.makeText(this, "Le Bluetooth n'est pas activé", Toast.LENGTH_SHORT).show()
+            finish()
+            return
         }
 
+        // Obtenez l'appareil Bluetooth
         try {
-            val device = bluetoothAdapter.getRemoteDevice(deviceAddress)
-            bluetoothGatt = device.connectGatt(this, false, gattCallback)
+            bluetoothDevice = bluetoothAdapter.getRemoteDevice(deviceAddress)
         } catch (e: IllegalArgumentException) {
-            Toast.makeText(this, "Erreur lors de la connexion à l'appareil", Toast.LENGTH_SHORT).show()
-            e.printStackTrace()
+            Toast.makeText(this, "Adresse de l'appareil invalide", Toast.LENGTH_SHORT).show()
+            finish()
         }
     }
 
-    private fun disconnectFromDevice() {
-        // Vérifier les permissions pour Android 12+
+    private fun connectToDevice() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-            if (checkSelfPermission(Manifest.permission.BLUETOOTH_CONNECT) != PackageManager.PERMISSION_GRANTED) {
-                // Ne pas retourner ici, car nous voulons toujours libérer les ressources
+            if (ActivityCompat.checkSelfPermission(
+                    this,
+                    Manifest.permission.BLUETOOTH_CONNECT
+                ) != PackageManager.PERMISSION_GRANTED
+            ) {
+                // Les permissions ne sont pas accordées, retournez ou demandez les permissions
+                return
             }
         }
+        bluetoothGatt = bluetoothDevice?.connectGatt(this, false, gattCallback)
+    }
 
-        bluetoothGatt?.let {
-            it.disconnect()
-            it.close()
-            bluetoothGatt = null
-            isConnected = false
-            servicesDiscovered = false
+    private fun disconnectFromDevice() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            if (ActivityCompat.checkSelfPermission(
+                    this,
+                    Manifest.permission.BLUETOOTH_CONNECT
+                ) != PackageManager.PERMISSION_GRANTED
+            ) {
+                // Les permissions ne sont pas accordées, retournez ou demandez les permissions
+                return
+            }
         }
+        bluetoothGatt?.disconnect()
+        bluetoothGatt?.close()
+        bluetoothGatt = null
+        isConnected = false
+        servicesDiscovered = false
+        Toast.makeText(this, "Déconnecté de l'appareil", Toast.LENGTH_SHORT).show()
     }
 
     private val gattCallback = object : BluetoothGattCallback() {
@@ -109,38 +146,29 @@ class LedActivity : ComponentActivity() {
             newState: Int
         ) {
             super.onConnectionStateChange(gatt, status, newState)
-            when (newState) {
-                BluetoothProfile.STATE_CONNECTED -> {
-                    Log.d("LedActivity", "Connecté à l'appareil")
-                    runOnUiThread {
-                        isConnected = true
-                        Toast.makeText(this@LedActivity, "Connecté à l'appareil", Toast.LENGTH_SHORT).show()
-                    }
-                    // Découvrir les services
+            if (newState == BluetoothProfile.STATE_CONNECTED) {
+                Log.d("LedActivity", "Connecté à l'appareil")
+                runOnUiThread {
+                    isConnected = true
+                    Toast.makeText(this@LedActivity, "Connecté à l'appareil", Toast.LENGTH_SHORT).show()
+                }
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
                     if (ActivityCompat.checkSelfPermission(
                             this@LedActivity,
                             Manifest.permission.BLUETOOTH_CONNECT
                         ) != PackageManager.PERMISSION_GRANTED
                     ) {
-                        // TODO: Consider calling
-                        //    ActivityCompat#requestPermissions
-                        // here to request the missing permissions, and then overriding
-                        //   public void onRequestPermissionsResult(int requestCode, String[] permissions,
-                        //                                          int[] grantResults)
-                        // to handle the case where the user grants the permission. See the documentation
-                        // for ActivityCompat#requestPermissions for more details.
+                        // Les permissions ne sont pas accordées
                         return
                     }
-                    gatt.discoverServices()
                 }
-                BluetoothProfile.STATE_DISCONNECTED -> {
-                    Log.d("LedActivity", "Déconnecté de l'appareil")
-                    runOnUiThread {
-                        isConnected = false
-                        servicesDiscovered = false
-                        Toast.makeText(this@LedActivity, "Déconnecté de l'appareil", Toast.LENGTH_SHORT).show()
-                    }
-                    bluetoothGatt = null
+                gatt.discoverServices()
+            } else if (newState == BluetoothProfile.STATE_DISCONNECTED) {
+                Log.d("LedActivity", "Déconnecté de l'appareil")
+                runOnUiThread {
+                    isConnected = false
+                    servicesDiscovered = false
+                    Toast.makeText(this@LedActivity, "Déconnecté de l'appareil", Toast.LENGTH_SHORT).show()
                 }
             }
         }
@@ -151,9 +179,17 @@ class LedActivity : ComponentActivity() {
                 Log.d("LedActivity", "Services découverts")
                 // Parcourir les services et caractéristiques pour trouver une caractéristique écrivable
                 for (service in gatt.services) {
+                    Log.d("LedActivity", "Service UUID : ${service.uuid}")
                     for (characteristic in service.characteristics) {
+                        Log.d("LedActivity", "Caractéristique UUID : ${characteristic.uuid}")
+                        Log.d(
+                            "LedActivity",
+                            "Propriétés : ${characteristic.properties}"
+                        )
                         // Vérifier si la caractéristique est écrivable
-                        if (characteristic.properties and BluetoothGattCharacteristic.PROPERTY_WRITE > 0) {
+                        val writeType = characteristic.properties and
+                                (BluetoothGattCharacteristic.PROPERTY_WRITE or BluetoothGattCharacteristic.PROPERTY_WRITE_NO_RESPONSE)
+                        if (writeType > 0) {
                             ledCharacteristic = characteristic
                             runOnUiThread {
                                 servicesDiscovered = true
@@ -185,7 +221,7 @@ class LedActivity : ComponentActivity() {
         }
     }
 
-    private fun controlLed(ledState: LedStateEnum) {
+    private fun controlLed(ledState: LEDStateEnum) {
         // Vérifier que la caractéristique est disponible
         val characteristic = ledCharacteristic ?: run {
             Toast.makeText(this, "Caractéristique LED non disponible", Toast.LENGTH_SHORT).show()
@@ -197,7 +233,11 @@ class LedActivity : ComponentActivity() {
 
         // Vérifier les permissions pour Android 12+
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-            if (checkSelfPermission(Manifest.permission.BLUETOOTH_CONNECT) != PackageManager.PERMISSION_GRANTED) {
+            if (ActivityCompat.checkSelfPermission(
+                    this,
+                    Manifest.permission.BLUETOOTH_CONNECT
+                ) != PackageManager.PERMISSION_GRANTED
+            ) {
                 Toast.makeText(this, "Permission BLUETOOTH_CONNECT non accordée", Toast.LENGTH_SHORT).show()
                 return
             }
@@ -224,14 +264,11 @@ class LedActivity : ComponentActivity() {
         if (requestCode == PERMISSION_REQUEST_CODE) {
             if ((grantResults.isNotEmpty() && grantResults[0] == PackageManager.PERMISSION_GRANTED)) {
                 // Permission accordée, reprendre l'action initiale
-                connectToDevice()
+                initializeBluetooth()
             } else {
                 Toast.makeText(this, "Permission BLUETOOTH_CONNECT non accordée", Toast.LENGTH_SHORT).show()
+                finish()
             }
         }
-    }
-
-    companion object {
-        private const val PERMISSION_REQUEST_CODE = 1
     }
 }

@@ -16,8 +16,9 @@ import androidx.compose.ui.unit.dp
 fun LedComposable(
     deviceName: String,
     isConnected: Boolean,
-    onLedButtonClick: (LedStateEnum) -> Unit,
-    onDisconnectClick: () -> Unit
+    onConnectClick: () -> Unit,
+    onDisconnectClick: () -> Unit,
+    onLedButtonClick: (LEDStateEnum) -> Unit
 ) {
     Scaffold(
         topBar = {
@@ -58,43 +59,53 @@ fun LedComposable(
 
             Spacer(modifier = Modifier.height(30.dp))
 
+            Button(
+                onClick = onConnectClick,
+                modifier = Modifier.fillMaxWidth(),
+                enabled = !isConnected
+            ) {
+                Text(text = "Se connecter")
+            }
+
+            Spacer(modifier = Modifier.height(20.dp))
+
             // Boutons pour contrôler les LEDs
             Button(
-                onClick = { onLedButtonClick(LedStateEnum.NONE) },
+                onClick = { onLedButtonClick(LEDStateEnum.NONE) },
                 modifier = Modifier.fillMaxWidth(),
                 enabled = isConnected
             ) {
-                Text(text = "0 LEDs")
+                Text(text = "Éteindre les LEDs")
             }
 
             Spacer(modifier = Modifier.height(10.dp))
 
             Button(
-                onClick = { onLedButtonClick(LedStateEnum.Led_1) },
+                onClick = { onLedButtonClick(LEDStateEnum.LED_1) },
                 modifier = Modifier.fillMaxWidth(),
                 enabled = isConnected
             ) {
-                Text(text = "LED n°1")
+                Text(text = "Allumer LED n°1")
             }
 
             Spacer(modifier = Modifier.height(10.dp))
 
             Button(
-                onClick = { onLedButtonClick(LedStateEnum.Led_2) },
+                onClick = { onLedButtonClick(LEDStateEnum.LED_2) },
                 modifier = Modifier.fillMaxWidth(),
                 enabled = isConnected
             ) {
-                Text(text = "LED n°2")
+                Text(text = "Allumer LED n°2")
             }
 
             Spacer(modifier = Modifier.height(10.dp))
 
             Button(
-                onClick = { onLedButtonClick(LedStateEnum.Led_3) },
+                onClick = { onLedButtonClick(LEDStateEnum.LED_3) },
                 modifier = Modifier.fillMaxWidth(),
                 enabled = isConnected
             ) {
-                Text(text = "LED n°3")
+                Text(text = "Allumer LED n°3")
             }
 
             Spacer(modifier = Modifier.height(30.dp))
@@ -102,6 +113,7 @@ fun LedComposable(
             Button(
                 onClick = onDisconnectClick,
                 colors = ButtonDefaults.buttonColors(MaterialTheme.colorScheme.error),
+                modifier = Modifier.fillMaxWidth(),
                 enabled = isConnected
             ) {
                 Text(text = "Se déconnecter")

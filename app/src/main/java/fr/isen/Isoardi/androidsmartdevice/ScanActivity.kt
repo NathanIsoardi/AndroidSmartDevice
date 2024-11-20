@@ -283,7 +283,7 @@ class ScanActivity : ComponentActivity() {
     }
 
     private fun onDeviceClick(device: BLEDevice) {
-        val intent = Intent(this, PageCoActivity::class.java).apply {
+        val intent = Intent(this, LedActivity::class.java).apply {
             putExtra("DEVICE_NAME", device.name)
             putExtra("DEVICE_ADDRESS", device.address)
             putExtra("DEVICE_RSSI", device.rssi)

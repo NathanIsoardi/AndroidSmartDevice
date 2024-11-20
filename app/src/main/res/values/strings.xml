@@ -3,4 +3,5 @@
     <string name="title_activity_scan">ScanActivity</string>
     <string name="title_activity_page_co">pageCo</string>
     <string name="title_activity_led">LedActivity</string>
+    <string name="title_activity_device_connection">DeviceConnectionActivity</string>
 </resources>
