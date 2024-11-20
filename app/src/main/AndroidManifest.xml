@@ -30,11 +30,6 @@
             android:label="@string/title_activity_led"
             android:theme="@style/Theme.AndroidSmartDevice" />
         <activity
-            android:name=".PageCoActivity"
-            android:exported="false"
-            android:label="@string/title_activity_page_co"
-            android:theme="@style/Theme.AndroidSmartDevice" />
-        <activity
             android:name=".ScanActivity"
             android:exported="false"
             android:label="@string/title_activity_scan"
