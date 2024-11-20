@@ -17,7 +17,6 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
-import androidx.compose.ui.graphics.Color
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
 import fr.isen.Isoardi.androidsmartdevice.ui.theme.AndroidSmartDeviceTheme
@@ -190,7 +189,7 @@ class ScanActivity : ComponentActivity() {
             val deviceAddress: String
             val rssi: Int = result.rssi
 
-            // Récupération du nom et de l'adresse de l'appareil (votre code existant)
+            // Récupération du nom et de l'adresse de l'appareil
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
                 if (ActivityCompat.checkSelfPermission(
                         this@ScanActivity,
@@ -208,10 +207,25 @@ class ScanActivity : ComponentActivity() {
                 deviceAddress = result.device.address ?: "Adresse inconnue"
             }
 
-            val bleDevice = BLEDevice(name = deviceName, address = deviceAddress, rssi = rssi)
-            if (!scanResults.any { it.address == bleDevice.address }) {
+            // Ajout du filtre pour ignorer les appareils nommés "Inconnu"
+            if (deviceName == "Inconnu") {
+                // Ignorer cet appareil
+                return
+            }
+
+            // Vérifier si l'appareil existe déjà dans la liste
+            val existingDeviceIndex = scanResults.indexOfFirst { it.address == deviceAddress }
+            if (existingDeviceIndex != -1) {
+                // Mettre à jour le RSSI de l'appareil existant
+                scanResults[existingDeviceIndex] = scanResults[existingDeviceIndex].copy(rssi = rssi)
+            } else {
+                // Ajouter le nouvel appareil à la liste
+                val bleDevice = BLEDevice(name = deviceName, address = deviceAddress, rssi = rssi)
                 scanResults.add(bleDevice)
             }
+
+            // Optionnel : trier la liste par RSSI décroissant
+            scanResults.sortByDescending { it.rssi }
         }
 
         override fun onBatchScanResults(results: List<ScanResult>) {
@@ -221,7 +235,7 @@ class ScanActivity : ComponentActivity() {
                 val deviceAddress: String
                 val rssi: Int = result.rssi
 
-                // Récupération du nom et de l'adresse de l'appareil (votre code existant)
+                // Récupération du nom et de l'adresse de l'appareil
                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
                     if (ActivityCompat.checkSelfPermission(
                             this@ScanActivity,
@@ -239,11 +253,26 @@ class ScanActivity : ComponentActivity() {
                     deviceAddress = result.device.address ?: "Adresse inconnue"
                 }
 
-                val bleDevice = BLEDevice(name = deviceName, address = deviceAddress, rssi = rssi)
-                if (!scanResults.any { it.address == bleDevice.address }) {
+                // Ajout du filtre pour ignorer les appareils nommés "Inconnu"
+                if (deviceName == "Inconnu") {
+                    // Ignorer cet appareil
+                    return@forEach
+                }
+
+                // Vérifier si l'appareil existe déjà dans la liste
+                val existingDeviceIndex = scanResults.indexOfFirst { it.address == deviceAddress }
+                if (existingDeviceIndex != -1) {
+                    // Mettre à jour le RSSI de l'appareil existant
+                    scanResults[existingDeviceIndex] = scanResults[existingDeviceIndex].copy(rssi = rssi)
+                } else {
+                    // Ajouter le nouvel appareil à la liste
+                    val bleDevice = BLEDevice(name = deviceName, address = deviceAddress, rssi = rssi)
                     scanResults.add(bleDevice)
                 }
             }
+
+            // Optionnel : trier la liste par RSSI décroissant
+            scanResults.sortByDescending { it.rssi }
         }
 
         override fun onScanFailed(errorCode: Int) {
@@ -254,19 +283,15 @@ class ScanActivity : ComponentActivity() {
     }
 
     private fun onDeviceClick(device: BLEDevice) {
-        // Pour l'instant, affichons un Toast avec les informations de l'appareil
-        Toast.makeText(this, "Appareil sélectionné : ${device.name} (${device.address})", Toast.LENGTH_SHORT).show()
-
-        // Si vous avez une DeviceDetailActivity, vous pouvez décommenter le code suivant
-        /*
-        val intent = Intent(this, DeviceDetailActivity::class.java).apply {
+        val intent = Intent(this, PageCoActivity::class.java).apply {
             putExtra("DEVICE_NAME", device.name)
             putExtra("DEVICE_ADDRESS", device.address)
+            putExtra("DEVICE_RSSI", device.rssi)
         }
         startActivity(intent)
-        */
     }
 
+    @Deprecated("Deprecated in Java")
     override fun onRequestPermissionsResult(requestCode: Int, permissions: Array<String>, grantResults: IntArray) {
         if (requestCode == PERMISSION_REQUEST_CODE) {
             val allPermissionsGranted = grantResults.all { it == PackageManager.PERMISSION_GRANTED }
